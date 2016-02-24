@@ -162,51 +162,10 @@ class TurnToRInstance(bpy.types.Operator):
 
 		return {'FINISHED'}
 
-class RInstancesToObjects(bpy.types.Operator):
+class ReleaseRInstance(bpy.types.Operator):
 	'''Tooltip'''
 	bl_description = "TODO"
-	bl_idname = "object.rinstances_to_objects"
-	bl_label = "Instances to Objects"
-	bl_options = {'REGISTER', 'UNDO'}
-
-	@classmethod
-	def poll(cls, context):
-		return True
-
-	def execute(self, context):
-
-		#replace make_real with manual duplicate objects from group and place over instances
-
-		#make duplicates real
-		for obj in bpy.context.selected_objects:
-
-			if obj.get('is_rcontainer') is not None:
-
-				bpy.ops.object.duplicates_make_real()
-
-		selected = bpy.context.selected_objects
-
-		#remove empties
-		for obj in selected:
-
-			if obj.get('is_rcontainer') is not None:
-
-				bpy.ops.object.select_all(action='DESELECT')
-				obj.select = True
-				bpy.ops.object.delete(use_global=False)
-
-		#reselect rest
-		for obj in selected:
-			obj.select = True
-
-		bpy.ops.object.clean_up_rinstances()
-
-		return {'FINISHED'}
-
-class OpenRInstance(bpy.types.Operator):
-	'''Tooltip'''
-	bl_description = "TODO"
-	bl_idname = "object.open_rinstance"
+	bl_idname = "object.release_rinstance"
 	bl_label = "Release Selected"
 	bl_options = {'REGISTER', 'UNDO'}
 
@@ -301,6 +260,83 @@ class OpenRInstance(bpy.types.Operator):
 
 		return {'FINISHED'}
 
+# TODO
+
+# class OpenRInstance(bpy.types.Operator):
+# 	'''Tooltip'''
+# 	bl_description = "TODO"
+# 	bl_idname = "object.release_rinstance"
+# 	bl_label = "Release Selected"
+# 	bl_options = {'REGISTER', 'UNDO'}
+
+# 	@classmethod
+# 	def poll(cls, context):
+# 		return True
+
+# 	def execute(self, context):
+
+# 		selected = bpy.context.selected_objects
+# 		rscene = get_rscene(context)
+# 		current_scene = bpy.context.window.screen.scene
+
+# 		bpy.ops.object.select_all(action='DESELECT')
+
+# 		for obj in selected:
+
+# 			#make sure it's an rinstance
+# 			if obj.get('is_rcontainer') is not None and obj.type == "EMPTY" and obj.dupli_type == 'GROUP':
+
+# 				#get rinstance
+# 				target_rinstance = obj
+
+# 				#get target rgroup
+# 				target_rgroup = obj.dupli_group
+
+# 		bpy.ops.object.clean_up_rinstances()
+
+# 		return {'FINISHED'}
+
+class RInstancesToObjects(bpy.types.Operator):
+	'''Tooltip'''
+	bl_description = "TODO"
+	bl_idname = "object.rinstances_to_objects"
+	bl_label = "Instances to Objects"
+	bl_options = {'REGISTER', 'UNDO'}
+
+	@classmethod
+	def poll(cls, context):
+		return True
+
+	def execute(self, context):
+
+		#replace make_real with manual duplicate objects from group and place over instances
+
+		#make duplicates real
+		for obj in bpy.context.selected_objects:
+
+			if obj.get('is_rcontainer') is not None:
+
+				bpy.ops.object.duplicates_make_real()
+
+		selected = bpy.context.selected_objects
+
+		#remove empties
+		for obj in selected:
+
+			if obj.get('is_rcontainer') is not None:
+
+				bpy.ops.object.select_all(action='DESELECT')
+				obj.select = True
+				bpy.ops.object.delete(use_global=False)
+
+		#reselect rest
+		for obj in selected:
+			obj.select = True
+
+		bpy.ops.object.clean_up_rinstances()
+
+		return {'FINISHED'}
+
 class CleanUpRInstances(bpy.types.Operator):
 	'''Tooltip'''
 	bl_description = "Deletes all objects in the storage that do not have an instance."
@@ -386,7 +422,7 @@ class addButtonsInObjectMode(bpy.types.Panel):
 		col = layout.column(align=True)
 
 		col.operator("object.turn_to_rinstance")
-		col.operator("object.open_rinstance")
+		col.operator("object.release_rinstance")
 		col = layout.column(align=True)
 		col.operator("object.rinstances_to_objects")
 
