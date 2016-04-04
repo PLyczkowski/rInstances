@@ -242,15 +242,31 @@ class ReleaseRInstance(bpy.types.Operator):
 				#switch back to current scene
 				bpy.context.window.screen.scene = current_scene
 
-				#currently selected - linked from rscene
-				bpy.ops.object.make_single_user(type='SELECTED_OBJECTS', object=True, obdata=False, material=False, texture=False, animation=False)
 				rgroup_contents = bpy.context.selected_objects
 
-				# # make single user which also removes from rgroup
-				# bpy.ops.object.select_all(action='DESELECT')
+				#make single user without losing user's groups
+				bpy.ops.object.select_all(action='DESELECT')
+
+				#TODO
 				# for obj in rgroup_contents:
-				# 	obj.select=True
+				# 	obj.select = True
 				# 	bpy.context.scene.objects.active = obj
+				# 	store_groups = obj.users_group
+				# 	bpy.ops.object.make_single_user(type='SELECTED_OBJECTS', object=True, obdata=False, material=False, texture=False, animation=False)
+					
+
+				# 	for group in store_groups:
+				# 		bpy.ops.object.group_link(group=group.name)
+
+
+				# 	bpy.ops.group.objects_remove(target_rgroup)
+
+				#currently selected - linked from rscene
+				for obj in rgroup_contents:
+					obj.select = True
+
+				# bpy.ops.object.make_single_user(type='SELECTED_OBJECTS', object=True, obdata=False, material=False, texture=False, animation=False)
+				# rgroup_contents = bpy.context.selected_objects
 
 				#parent to empty
 				bpy.ops.object.select_all(action='DESELECT')
@@ -709,13 +725,13 @@ class addButtonsInObjectMode(bpy.types.Panel):
 		col = layout.column(align=True)
 		col.operator("object.rinstances_to_objects")
 		
-		found_parent = False
-		for obj in bpy.context.selected_objects:
-			if  obj.parent != None:
-				found_parent = True
+		# found_parent = False
+		# for obj in bpy.context.selected_objects:
+		# 	if  obj.parent != None:
+		# 		found_parent = True
 
-		if found_parent:
-			layout.label(icon="ERROR", text="Parent data won't be preserved!")
+		# if found_parent:
+		# 	layout.label(icon="ERROR", text="Parent data won't be preserved!")
 
 ############
 # REGISTER #
