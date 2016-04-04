@@ -331,7 +331,14 @@ class OpenRInstance(bpy.types.Operator):
 
 				#get rinstance
 				target_rinstance = obj
+				target_rinstance_name = target_rinstance.name
 				target_group = target_rinstance.dupli_group
+
+				#store and clear scale
+				stored_scaleX = target_rinstance.scale[0]
+				stored_scaleY = target_rinstance.scale[1]
+				stored_scaleZ = target_rinstance.scale[2]
+				target_rinstance.scale = (0,0,0)
 
 				#get target rgroup
 				target_rgroup = obj.dupli_group
@@ -353,12 +360,18 @@ class OpenRInstance(bpy.types.Operator):
 				target_rinstance.select = True
 				bpy.ops.object.release_rinstance() #only content selected
 
-
+				#restore name
+				empty.name = target_rinstance_name
 
 				#parent instance content to empty
 				empty.select = True
 				bpy.context.scene.objects.active = empty
 				bpy.ops.object.parent_set(type='OBJECT', keep_transform=True)
+
+				#restore scale
+				bpy.context.object.scale[0] = stored_scaleX
+				bpy.context.object.scale[1] = stored_scaleY
+				bpy.context.object.scale[2] = stored_scaleZ
 
 		#reselect empties
 		bpy.ops.object.select_all(action='DESELECT')
@@ -406,12 +419,23 @@ class CloseRInstance(bpy.types.Operator):
 
 		for open_rinstance in selected:
 
-			#get target rGroup
+			#get rinstance data
 			open_rinstance.select = True
+			bpy.context.scene.objects.active = open_rinstance
 			target_rgroup = open_rinstance.get('rGroup')
+			open_rinstance_name = open_rinstance.name
 
 			#get new_rinstance_content
 			new_rinstance_content = open_rinstance.children
+
+			#place cursor
+			bpy.ops.view3d.snap_cursor_to_active()
+
+			#store and clear scale
+			stored_scaleX = open_rinstance.scale[0]
+			stored_scaleY = open_rinstance.scale[1]
+			stored_scaleZ = open_rinstance.scale[2]
+			bpy.ops.object.scale_clear()
 
 			#select children
 			bpy.ops.object.select_all(action='DESELECT')
@@ -420,9 +444,108 @@ class CloseRInstance(bpy.types.Operator):
 				bpy.context.scene.objects.active = obj
 				bpy.ops.object.group_link(group=target_rgroup)
 
+				#clear parent
+				bpy.ops.object.parent_clear(type='CLEAR_KEEP_TRANSFORM')
 
-			# bpy.ops.group.create(name="TestGroup")
-			# bpy.ops.object.group_link("TestGroup")
+			#clean rGroup from rScene
+			rscene = get_or_create_rscene(context)
+
+			if rscene is not None:
+
+				bpy.context.window.screen.scene = rscene
+
+				bpy.ops.object.select_all(action='DESELECT')
+
+				for obj in rscene.objects: # All objects in rscene
+
+					is_in_target_rgroup = False
+
+					for group in obj.users_group: # All groups on object
+
+						if group.name == target_rgroup:
+
+							is_in_target_rgroup = True
+
+					if is_in_target_rgroup:
+
+						obj.select = True
+						bpy.ops.object.delete()
+
+			bpy.context.window.screen.scene = current_scene
+
+			#add empty
+			bpy.ops.object.select_all(action='DESELECT')
+			bpy.ops.object.empty_add(type='PLAIN_AXES')
+			empty_obj = bpy.context.active_object
+			
+			#copy rotation from active
+			empty_obj.rotation_euler = open_rinstance.rotation_euler
+
+			#Parent the new_rinstance_content to empty
+			for obj in new_rinstance_content:
+				obj.select = True
+				obj.parent = empty_obj
+			bpy.context.scene.objects.active = empty_obj
+			empty_obj.select = True
+			bpy.ops.object.parent_set(type='OBJECT', keep_transform=False)
+
+			#move to center
+			bpy.ops.object.select_all(action='DESELECT')
+			empty_obj.select = True
+			bpy.ops.object.location_clear()
+			bpy.ops.object.rotation_clear()
+
+			#unparent
+			bpy.ops.object.select_all(action='DESELECT')
+			for obj in new_rinstance_content:
+				obj.select = True
+				bpy.ops.object.parent_clear(type='CLEAR_KEEP_TRANSFORM')
+
+			#delete empty
+			bpy.ops.object.select_all(action='DESELECT')
+			empty_obj.select = True
+			bpy.ops.object.delete(use_global=False)
+
+			#add group
+			bpy.ops.object.select_all(action='DESELECT')
+			for obj in new_rinstance_content:
+				obj.select = True
+			bpy.ops.group.create(name = RGROUP)
+
+			#get newest rgroup
+			group = bpy.context.selected_objects[0].users_group[0]
+
+			# Try to get or create new rscene
+			rscene = get_or_create_rscene(context)
+
+			#move to an rscene
+			bpy.ops.object.select_all(action='DESELECT')
+			for obj in new_rinstance_content:
+				obj.select = True
+				bpy.ops.object.make_links_scene(scene=RSCENE)
+				bpy.ops.object.delete(use_global=False)
+
+			#add instace
+			bpy.ops.object.empty_add(type='PLAIN_AXES')
+			instance_empty = bpy.context.scene.objects.active
+			bpy.context.object.empty_draw_size = 0.01
+			bpy.context.object.dupli_type = 'GROUP'
+			bpy.context.object.dupli_group = bpy.data.groups[group.name]
+			instance_empty["is_rinstance"] = True
+
+			#restore rotation
+			bpy.context.object.rotation_euler = open_rinstance.rotation_euler
+
+			#restore scale
+			bpy.context.object.scale[0] = stored_scaleX
+			bpy.context.object.scale[1] = stored_scaleY
+			bpy.context.object.scale[2] = stored_scaleZ
+
+			#clean up
+			bpy.ops.object.select_all(action='DESELECT')
+			open_rinstance.select = True
+			bpy.ops.object.delete(use_global=False)
+			instance_empty.name = open_rinstance_name
 
 		#restore cursor
 		context.space_data.cursor_location.x = storeCursorX
@@ -527,7 +650,7 @@ class CleanUpRInstances(bpy.types.Operator):
 
 				if got_instance == False:
 
-					print("RContainer object "+obj.name+" is orphaned, deleting.")
+					print("rInstance object "+obj.name+" is orphaned, deleting.")
 					obj.select = True
 					bpy.ops.object.delete()
 
