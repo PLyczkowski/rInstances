@@ -56,7 +56,17 @@ class TurnToRInstance(bpy.types.Operator):
 
 	@classmethod
 	def poll(cls, context):
-		return True
+		
+		found_bad_one = False
+
+		for obj in bpy.context.selected_objects:
+			if  obj.parent != None:
+				found_bad_one = True
+
+		if found_bad_one:
+			return False
+		else:
+			return True
 
 	def execute(self, context):
 
@@ -140,7 +150,7 @@ class TurnToRInstance(bpy.types.Operator):
 		bpy.context.object.empty_draw_size = 0.01
 		bpy.context.object.dupli_type = 'GROUP'
 		bpy.context.object.dupli_group = bpy.data.groups[group.name]
-		instance_empty["is_rcontainer"] = True
+		instance_empty["is_rinstance"] = True
 
 		#restore rotation
 		if self.use_rotation_from_active:
@@ -171,7 +181,19 @@ class ReleaseRInstance(bpy.types.Operator):
 
 	@classmethod
 	def poll(cls, context):
-		return True
+		
+		found_bad_one = False
+
+		for obj in bpy.context.selected_objects:
+			if  obj.type == "EMPTY" and obj.get('is_rinstance') is not None and obj.dupli_type == 'GROUP':
+				pass
+			else:
+				found_bad_one = True
+
+		if found_bad_one:
+			return False
+		else:
+			return True
 
 	def execute(self, context):
 
@@ -179,12 +201,14 @@ class ReleaseRInstance(bpy.types.Operator):
 		rscene = get_rscene(context)
 		current_scene = bpy.context.window.screen.scene
 
+		released_objects = []
+
 		bpy.ops.object.select_all(action='DESELECT')
 
 		for obj in selected:
 
 			#make sure it's an rinstance
-			if obj.get('is_rcontainer') is not None and obj.type == "EMPTY" and obj.dupli_type == 'GROUP':
+			if obj.get('is_rinstance') is not None and obj.type == "EMPTY" and obj.dupli_type == 'GROUP':
 
 				#get rinstance
 				target_rinstance = obj
@@ -247,6 +271,10 @@ class ReleaseRInstance(bpy.types.Operator):
 					obj.select = True
 					bpy.ops.object.parent_clear(type='CLEAR_KEEP_TRANSFORM')
 
+				#store rgroup contents
+				for obj in rgroup_contents:
+					released_objects.append(obj)
+
 				#clean up
 				bpy.ops.object.select_all(action='DESELECT')
 				instance_replacement_empty.select = True
@@ -254,58 +282,179 @@ class ReleaseRInstance(bpy.types.Operator):
 				target_rinstance.select = True
 				bpy.ops.object.delete(use_global=False)
 
-		#TODO reselect the rinstances contents here
+		# reselect the rinstances contents here
+		bpy.ops.object.select_all(action='DESELECT')
+		for obj in released_objects:
+			obj.select = True
 
 		bpy.ops.object.clean_up_rinstances()
 
 		return {'FINISHED'}
 
-# TODO
+class OpenRInstance(bpy.types.Operator):
+	'''Tooltip'''
+	bl_description = "TODO"
+	bl_idname = "object.open_rinstance"
+	bl_label = "Open Instance"
+	bl_options = {'REGISTER', 'UNDO'}
 
-# class OpenRInstance(bpy.types.Operator):
-# 	'''Tooltip'''
-# 	bl_description = "TODO"
-# 	bl_idname = "object.release_rinstance"
-# 	bl_label = "Release Selected"
-# 	bl_options = {'REGISTER', 'UNDO'}
+	@classmethod
+	def poll(cls, context):
 
-# 	@classmethod
-# 	def poll(cls, context):
-# 		return True
+		found_bad_one = False
 
-# 	def execute(self, context):
+		for obj in bpy.context.selected_objects:
+			if  obj.type == "EMPTY" and obj.get('is_rinstance') is not None and obj.dupli_type == 'GROUP':
+				pass
+			else:
+				found_bad_one = True
 
-# 		selected = bpy.context.selected_objects
-# 		rscene = get_rscene(context)
-# 		current_scene = bpy.context.window.screen.scene
+		if found_bad_one:
+			return False
+		else:
+			return True
 
-# 		bpy.ops.object.select_all(action='DESELECT')
+	def execute(self, context):
 
-# 		for obj in selected:
+		selected = bpy.context.selected_objects
+		rscene = get_rscene(context)
+		current_scene = bpy.context.window.screen.scene
 
-# 			#make sure it's an rinstance
-# 			if obj.get('is_rcontainer') is not None and obj.type == "EMPTY" and obj.dupli_type == 'GROUP':
+		released_empties = []
 
-# 				#get rinstance
-# 				target_rinstance = obj
+		bpy.ops.object.select_all(action='DESELECT')
 
-# 				#get target rgroup
-# 				target_rgroup = obj.dupli_group
+		for obj in selected:
 
-# 		bpy.ops.object.clean_up_rinstances()
+			#make sure it's an rinstance
+			if obj.get('is_rinstance') is not None and obj.type == "EMPTY" and obj.dupli_type == 'GROUP':
 
-# 		return {'FINISHED'}
+				#get rinstance
+				target_rinstance = obj
+				target_group = target_rinstance.dupli_group
+
+				#get target rgroup
+				target_rgroup = obj.dupli_group
+
+				#create empty with group stored
+				bpy.ops.object.empty_add(type='SPHERE', radius=1, view_align=False, location=(0, 0, 0))
+				bpy.context.object.show_x_ray = True
+				empty = bpy.context.scene.objects.active
+				empty.location = obj.location
+				empty.rotation_euler = obj.rotation_euler
+				empty["rGroup"] = target_group.name
+				empty["opened_rInstance"] = True
+
+				#store empty
+				released_empties.append(empty)
+
+				#release rinstance
+				bpy.ops.object.select_all(action='DESELECT')
+				target_rinstance.select = True
+				bpy.ops.object.release_rinstance() #only content selected
+
+
+
+				#parent instance content to empty
+				empty.select = True
+				bpy.context.scene.objects.active = empty
+				bpy.ops.object.parent_set(type='OBJECT', keep_transform=True)
+
+		#reselect empties
+		bpy.ops.object.select_all(action='DESELECT')
+		for obj in released_empties:
+			obj.select = True
+		
+		bpy.ops.object.clean_up_rinstances()
+
+		return {'FINISHED'}
+
+class CloseRInstance(bpy.types.Operator):
+	'''Tooltip'''
+	bl_description = "TODO"
+	bl_idname = "object.close_rinstance"
+	bl_label = "Close Instance"
+	bl_options = {'REGISTER', 'UNDO'}
+
+	@classmethod
+	def poll(cls, context):
+
+		found_bad_one = False
+
+		for obj in bpy.context.selected_objects:
+			if  obj.type == "EMPTY" and obj.get('opened_rInstance') is not None:
+				pass
+			else:
+				found_bad_one = True
+
+		if found_bad_one:
+			return False
+		else:
+			return True
+
+	def execute(self, context):
+
+		selected = bpy.context.selected_objects
+		rscene = get_rscene(context)
+		current_scene = bpy.context.window.screen.scene
+
+		storeCursorX = context.space_data.cursor_location.x
+		storeCursorY = context.space_data.cursor_location.y
+		storeCursorZ = context.space_data.cursor_location.z
+
+		bpy.ops.object.select_all(action='DESELECT')
+
+		for open_rinstance in selected:
+
+			#get target rGroup
+			open_rinstance.select = True
+			target_rgroup = open_rinstance.get('rGroup')
+
+			#get new_rinstance_content
+			new_rinstance_content = open_rinstance.children
+
+			#select children
+			bpy.ops.object.select_all(action='DESELECT')
+			for obj in new_rinstance_content:
+				obj.select = True
+				bpy.context.scene.objects.active = obj
+				bpy.ops.object.group_link(group=target_rgroup)
+
+
+			# bpy.ops.group.create(name="TestGroup")
+			# bpy.ops.object.group_link("TestGroup")
+
+		#restore cursor
+		context.space_data.cursor_location.x = storeCursorX
+		context.space_data.cursor_location.y = storeCursorY
+		context.space_data.cursor_location.z = storeCursorZ
+		
+		bpy.ops.object.clean_up_rinstances()
+
+		return {'FINISHED'}
 
 class RInstancesToObjects(bpy.types.Operator):
 	'''Tooltip'''
 	bl_description = "TODO"
 	bl_idname = "object.rinstances_to_objects"
-	bl_label = "Instances to Objects"
+	bl_label = "Release Hierarchy"
 	bl_options = {'REGISTER', 'UNDO'}
 
 	@classmethod
 	def poll(cls, context):
-		return True
+
+		found_bad_one = False
+
+		for obj in bpy.context.selected_objects:
+			if  obj.type == "EMPTY" and obj.get('is_rinstance') is not None and obj.dupli_type == 'GROUP':
+				pass
+			else:
+				found_bad_one = True
+
+		if found_bad_one:
+			return False
+		else:
+			return True
 
 	def execute(self, context):
 
@@ -314,7 +463,7 @@ class RInstancesToObjects(bpy.types.Operator):
 		#make duplicates real
 		for obj in bpy.context.selected_objects:
 
-			if obj.get('is_rcontainer') is not None:
+			if obj.get('is_rinstance') is not None:
 
 				bpy.ops.object.duplicates_make_real()
 
@@ -323,7 +472,7 @@ class RInstancesToObjects(bpy.types.Operator):
 		#remove empties
 		for obj in selected:
 
-			if obj.get('is_rcontainer') is not None:
+			if obj.get('is_rinstance') is not None:
 
 				bpy.ops.object.select_all(action='DESELECT')
 				obj.select = True
@@ -390,6 +539,10 @@ class CleanUpRInstances(bpy.types.Operator):
 
 		return {'FINISHED'}
 
+#########
+# DEF'S #
+#########
+
 def get_rscene(context):
 	rscene_name = RSCENE
 
@@ -406,6 +559,10 @@ def get_or_create_rscene(context):
 	else:
 		return bpy.data.scenes.new(rscene_name)
 	return None
+
+######
+# UI #
+######
 
 class addButtonsInObjectMode(bpy.types.Panel):
 	bl_idname = "rInstances"
@@ -424,7 +581,22 @@ class addButtonsInObjectMode(bpy.types.Panel):
 		col.operator("object.turn_to_rinstance")
 		col.operator("object.release_rinstance")
 		col = layout.column(align=True)
+		col.operator("object.open_rinstance")
+		col.operator("object.close_rinstance")
+		col = layout.column(align=True)
 		col.operator("object.rinstances_to_objects")
+		
+		found_parent = False
+		for obj in bpy.context.selected_objects:
+			if  obj.parent != None:
+				found_parent = True
+
+		if found_parent:
+			layout.label(icon="ERROR", text="Parent data won't be preserved!")
+
+############
+# REGISTER #
+############
 
 def register():
 
